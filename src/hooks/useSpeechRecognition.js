@@ -6,6 +6,7 @@ export function useSpeechRecognition({ lang = 'en-IN', onResult }) {
   const [isSupported, setIsSupported] = useState(true);
   const recognitionRef = useRef(null);
   const onResultRef = useRef(onResult);
+  const lastProcessedIndexRef = useRef(0);
 
   useEffect(() => {
     onResultRef.current = onResult;
@@ -24,11 +25,18 @@ export function useSpeechRecognition({ lang = 'en-IN', onResult }) {
 
     recognition.onresult = (event) => {
       let finalTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      
+      // Use Math.max to prevent processing the same finalized result multiple times
+      // if the browser fails to correctly increment event.resultIndex
+      const startIndex = Math.max(event.resultIndex, lastProcessedIndexRef.current);
+      
+      for (let i = startIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
           finalTranscript += event.results[i][0].transcript;
+          lastProcessedIndexRef.current = i + 1; // Mark as processed
         }
       }
+      
       if (finalTranscript && onResultRef.current) {
         onResultRef.current(finalTranscript);
       }
@@ -65,6 +73,7 @@ export function useSpeechRecognition({ lang = 'en-IN', onResult }) {
       recognitionRef.current.stop();
     } else {
       try {
+        lastProcessedIndexRef.current = 0; // Reset on new session
         recognitionRef.current.start();
         setIsListening(true);
       } catch (e) {
